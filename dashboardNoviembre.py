@@ -886,7 +886,7 @@ iconos = {
     'BAJA': "<span style='font-size:2.2em; color:#d32f2f;'>🔴</span>"
 }
 color_card = {
-    '+ALTA': '#ffe6e6',
+    '+ALTA': '#66bb6a',
     'ALTA': '#e8f5e9',   # verde claro
     'MEDIA': '#fffde7',  # amarillo claro
     'BAJA': '#ffe6e6'    # rojo claro
@@ -944,7 +944,7 @@ st.markdown("""
         <span style='font-size:1.2em;'>⚡ <b>Sistema de Prioridades</b></span>
         <span style='font-size:1.1em;'>🧨 <b>+ALTA:</b> Prioridad 13 + Contacto Directo + Sin Pago</span>
         <span style='font-size:1.1em; color:#388e3c;'>🟢 <b>ALTA:</b> Prioridad 13 (todos)</span>
-        <span style='font-size:1.1em; color:#fbc02d;'>🟡 <b>MEDIA:</b> Prioridades 6-11</span>
+        <span style='font-size:1.1em; color:#fbc02d;'>🟡 <b>MEDIA:</b> Prioridades 6-12</span>
         <span style='font-size:1.1em; color:#d32f2f;'>🔴 <b>BAJA:</b> Prioridades 1-5</span>
     </div>
 </div>
