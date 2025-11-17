@@ -1,5 +1,5 @@
 import streamlit as st
-st.set_page_config(layout="wide")
+st.set_page_config(layout="wide", page_icon="🏦", page_title="AFP Noviembre 2025")
 # Forzar fondo blanco en toda la app
 st.markdown("""
 <style>
@@ -11,6 +11,7 @@ body, .main, [data-testid="stAppViewContainer"], [data-testid="stAppViewBlockCon
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import re
 import os
 
 # Ruta del archivo Excel (usar ruta relativa para Streamlit Cloud)
@@ -838,29 +839,29 @@ st.markdown("""
 
 # Clasificación de casos
 df_analisis = df.copy()
-df_analisis['NIVEL_RIESGO'] = 'BAJO'
+df_analisis['NIVEL_RIESGO'] = 'BAJA'
 # CRÍTICO: PRIORIDAD contiene "12" + CONTACTABILIDAD = "Contacto Directo" + TIPO DE PAGO = "FALTA PAGO DE PAGO PLANILLAS"
 # CRÍTICO: PRIORIDAD contiene "12" + CONTACTABILIDAD = "Contacto Directo" + TIPO DE PAGO = "FALTA PAGO DE PAGO PLANILLAS"
 # CRÍTICO: PRIORIDAD inicia con "12", CONTACTABILIDAD tiene algún valor y REC. PLANILLAS está vacío o cero
 cond_critico = (
-    df_analisis['PRIORIDAD'].astype(str).str.startswith('12') &
+    df_analisis['PRIORIDAD'].astype(str).str.startswith('13') &
     (df_analisis['CONTACTABILIDAD'].astype(str).str.strip().str.lower() == 'contacto directo') &
     ((df_analisis['REC. PLANILLAS'].isna()) | (df_analisis['REC. PLANILLAS'] == 0) | (df_analisis['REC. PLANILLAS'] == ''))
 )
-df_analisis['NIVEL_RIESGO'] = 'BAJO'  # Reiniciar para evitar solapamientos
-df_analisis.loc[cond_critico, 'NIVEL_RIESGO'] = 'CRITICO'
+df_analisis['NIVEL_RIESGO'] = 'BAJA'  # Reiniciar para evitar solapamientos
+df_analisis.loc[cond_critico, 'NIVEL_RIESGO'] = '+ALTA'
 # ALTO: PRIORIDAD contiene "12" pero NO es crítico
 cond_alto = (
-    df_analisis['PRIORIDAD'].astype(str).str.startswith('12') & (~cond_critico)
+    df_analisis['PRIORIDAD'].astype(str).str.startswith('13') & (~cond_critico)
 )
-df_analisis.loc[cond_alto, 'NIVEL_RIESGO'] = 'ALTO'
+df_analisis.loc[cond_alto, 'NIVEL_RIESGO'] = 'ALTA'
 # MEDIO: PRIORIDAD contiene "11", "10", "09", "08", "07", "06", "05"
-cond_medio = df_analisis['PRIORIDAD'].astype(str).str.startswith(('11', '10', '09', '08', '07', '06', '05'))
-df_analisis.loc[cond_medio & (~cond_critico) & (~cond_alto), 'NIVEL_RIESGO'] = 'MEDIO'
+cond_medio = df_analisis['PRIORIDAD'].astype(str).str.startswith(('12','11', '10', '09', '08', '07', '06', '05'))
+df_analisis.loc[cond_medio & (~cond_critico) & (~cond_alto), 'NIVEL_RIESGO'] = 'MEDIA'
 # BAJO: el resto (ya está por defecto)
 # MEDIO: PRIORIDAD contiene "11", "10", "09", "08", "07", "06", "05"
-cond_medio = df_analisis['PRIORIDAD'].astype(str).str.startswith(('11', '10', '09', '08', '07', '06', '05'))
-df_analisis.loc[cond_medio, 'NIVEL_RIESGO'] = 'MEDIO'
+cond_medio = df_analisis['PRIORIDAD'].astype(str).str.startswith(('12','11', '10', '09', '08', '07', '06', '05'))
+df_analisis.loc[cond_medio, 'NIVEL_RIESGO'] = 'MEDIA'
 # BAJO: el resto (ya está por defecto)
 
 # Métricas por nivel
@@ -873,22 +874,22 @@ total_cuentas = resumen_nivel['CUENTAS'].sum()
 resumen_nivel['% DEL TOTAL'] = resumen_nivel['CUENTAS'] / total_cuentas * 100
 
 # Ordenar niveles
-orden_niveles = ['CRITICO', 'ALTO', 'MEDIO', 'BAJO']
+orden_niveles = ['+ALTA', 'ALTA', 'MEDIA', 'BAJA']
 resumen_nivel['ORDEN'] = resumen_nivel['NIVEL_RIESGO'].apply(lambda x: orden_niveles.index(x) if x in orden_niveles else 99)
 resumen_nivel = resumen_nivel.sort_values('ORDEN')
 
 # Colores e íconos
 iconos = {
-    'CRITICO': "<span style='font-size:2.2em;'>🧨</span>",
-    'ALTO': "<span style='font-size:2.2em; color:#d32f2f;'>🔴</span>",
-    'MEDIO': "<span style='font-size:2.2em; color:#fbc02d;'>🟡</span>",
-    'BAJO': "<span style='font-size:2.2em; color:#388e3c;'>🟢</span>"
+    '+ALTA': "<span style='font-size:2.2em;'>🧨</span>",
+    'ALTA': "<span style='font-size:2.2em; color:#2e7d32;'>🟢</span>",
+    'MEDIA': "<span style='font-size:2.2em; color:#fbc02d;'>🟡</span>",
+    'BAJA': "<span style='font-size:2.2em; color:#d32f2f;'>🔴</span>"
 }
 color_card = {
-    'CRITICO': '#ffe6e6',
-    'ALTO': '#fff3e0',
-    'MEDIO': '#fffde7',
-    'BAJO': '#e8f5e9'
+    '+ALTA': '#ffe6e6',
+    'ALTA': '#e8f5e9',   # verde claro
+    'MEDIA': '#fffde7',  # amarillo claro
+    'BAJA': '#ffe6e6'    # rojo claro
 }
 
 # Visualización horizontal
@@ -941,10 +942,10 @@ st.markdown("""
 <div style='width:100%; display:flex; justify-content:center; margin:24px 0 12px 0;'>
     <div style='display:flex; gap:38px; align-items:center; background:#f7f9fc; border-radius:16px; padding:18px 32px;'>
         <span style='font-size:1.2em;'>⚡ <b>Sistema de Prioridades</b></span>
-        <span style='font-size:1.1em;'>🧨 <b>CRÍTICO:</b> Prioridad 12 + Contacto Directo + Sin Pago</span>
-        <span style='font-size:1.1em; color:#d32f2f;'>🔴 <b>ALTO:</b> Prioridad 12 (todos)</span>
-        <span style='font-size:1.1em; color:#fbc02d;'>🟡 <b>MEDIO:</b> Prioridades 6-11</span>
-        <span style='font-size:1.1em; color:#388e3c;'>🟢 <b>BAJO:</b> Prioridades 1-5</span>
+        <span style='font-size:1.1em;'>🧨 <b>+ALTA:</b> Prioridad 13 + Contacto Directo + Sin Pago</span>
+        <span style='font-size:1.1em; color:#388e3c;'>🟢 <b>ALTA:</b> Prioridad 13 (todos)</span>
+        <span style='font-size:1.1em; color:#fbc02d;'>🟡 <b>MEDIA:</b> Prioridades 6-11</span>
+        <span style='font-size:1.1em; color:#d32f2f;'>🔴 <b>BAJA:</b> Prioridades 1-5</span>
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -955,11 +956,11 @@ st.markdown("""
 <div style='display: flex; align-items: center; margin-top:32px;'>
     <img src='https://img.icons8.com/emoji/48/000000/bomb-emoji.png' style='margin-right: 10px;'/>
     <h2 style='display: inline; font-size: 2rem; margin: 0; color: #c62828;'>
-        Detalle de Casos Críticos (Prioridad 12 + Contacto Directo + Sin Pago)
+        Detalle de Casos Críticos (Prioridad 13 + Contacto Directo + Sin Pago)
     </h2>
 </div>
 """, unsafe_allow_html=True)
-df_critico = df_analisis[df_analisis['NIVEL_RIESGO'] == 'CRITICO']
+df_critico = df_analisis[df_analisis['NIVEL_RIESGO'] == '+ALTA']
 st.write(f"Total de casos críticos detectados: {len(df_critico)}")
 
 # Descripción de distribución por campaña
@@ -1041,51 +1042,81 @@ tabla_html += """
 st.markdown(tabla_html, unsafe_allow_html=True)
 # === HISTORIAL DE PAGOS (ACTUALIZADO) ===
 # Crear df_pagos desde el DataFrame principal, seleccionando columnas que pueden existir
-cols = ['campana', 'tipo_pago', 'fecha', 'monto', 'documento', 'razon_social']
-existing = [c for c in cols if c in df.columns]
 df_pagos = pd.DataFrame()
+
+# Helpers para parseo y limpieza
+def _parse_fecha_serie(s):
+    # Si vienen como números (serial Excel), convertir desde 1899-12-30
+    try:
+        if pd.api.types.is_numeric_dtype(s):
+            origin = pd.Timestamp('1899-12-30')
+            return s.apply(lambda v: origin + pd.to_timedelta(int(v), unit='D') if not pd.isna(v) else pd.NaT)
+    except Exception:
+        pass
+    return pd.to_datetime(s, dayfirst=True, errors='coerce')
+
+def _clean_monto(val):
+    try:
+        if pd.isna(val):
+            return np.nan
+        s = str(val)
+        # eliminar prefijos tipo 'S/.' y cualquier caracter no numérico salvo ,.-
+        s = re.sub(r"S\.?/?\s*", "", s)
+        s = re.sub(r"[^0-9,\.-]", "", s)
+        if s == '':
+            return np.nan
+        # si tiene coma y punto, asumimos coma miles y punto decimal -> eliminar comas
+        if s.count(',') > 0 and s.count('.') > 0:
+            s = s.replace(',', '')
+        # si tiene sólo comas, convertir coma decimal a punto
+        elif s.count(',') > 0 and s.count('.') == 0:
+            s = s.replace(',', '.')
+        s = s.replace(' ', '')
+        return float(s)
+    except Exception:
+        return np.nan
 
 # Procesar datos de pagos de planillas y gastos
 if not df.empty:
-    # Procesar pagos de planillas
     if 'FECHA DE PAGO P' in df.columns and 'REC. PLANILLAS' in df.columns:
         df_planillas = df[['FECHA DE PAGO P', 'REC. PLANILLAS', 'CAMPAÑA', 'RAZON SOCIAL']].rename(columns={
             'FECHA DE PAGO P': 'fecha',
             'REC. PLANILLAS': 'monto',
             'CAMPAÑA': 'campana',
             'RAZON SOCIAL': 'razon_social'
-        })
+        }).copy()
         df_planillas['tipo_pago'] = 'PLANILLAS'
 
-    # Procesar pagos de gastos
     if 'FECHA DE PAGO G' in df.columns and 'REC. GASTOS' in df.columns:
         df_gastos = df[['FECHA DE PAGO G', 'REC. GASTOS', 'CAMPAÑA', 'RAZON SOCIAL']].rename(columns={
             'FECHA DE PAGO G': 'fecha',
             'REC. GASTOS': 'monto',
             'CAMPAÑA': 'campana',
             'RAZON SOCIAL': 'razon_social'
-        })
+        }).copy()
         df_gastos['tipo_pago'] = 'GASTOS'
 
-    # Concatenar ambos DataFrames si existen
-    if 'df_planillas' in locals() and 'df_gastos' in locals():
-        df_pagos = pd.concat([df_planillas, df_gastos], ignore_index=True)
-    elif 'df_planillas' in locals():
-        df_pagos = df_planillas.copy()
-    elif 'df_gastos' in locals():
-        df_pagos = df_gastos.copy()
+    parts = []
+    if 'df_planillas' in locals():
+        parts.append(df_planillas)
+    if 'df_gastos' in locals():
+        parts.append(df_gastos)
+    if parts:
+        df_pagos = pd.concat(parts, ignore_index=True)
 
-# Asegurarse de que las columnas estén correctamente formateadas
+# Limpiar y normalizar columnas
 if not df_pagos.empty:
-    df_pagos['razon_social'] = df_pagos['razon_social'].fillna('Desconocido').astype(str).str.strip()
-    df_pagos['fecha'] = pd.to_datetime(df_pagos['fecha'], errors='coerce')
-    df_pagos['monto'] = pd.to_numeric(df_pagos['monto'], errors='coerce')
-    df_pagos['campana'] = df_pagos['campana'].astype(str).fillna('Sin campaña')
+    df_pagos['razon_social'] = df_pagos.get('razon_social', '').fillna('Desconocido').astype(str).str.strip()
+    df_pagos['campana'] = df_pagos.get('campana', '').fillna('Sin campaña').astype(str).str.strip()
+    df_pagos['fecha'] = _parse_fecha_serie(df_pagos['fecha'])
+    df_pagos['monto'] = df_pagos['monto'].apply(_clean_monto)
+    # Filtrar sólo pagos con monto válido o fecha conocida
+    df_pagos = df_pagos.loc[(df_pagos['monto'].notna() & (df_pagos['monto'] > 0)) | df_pagos['fecha'].notna()]
 
 # Verificar si df_pagos contiene datos válidos
 if df_pagos.empty:
-    st.warning("El DataFrame de pagos está vacío. No se puede mostrar el historial de pagos.")
+    st.warning("El DataFrame de pagos está vacío o no contiene pagos recientes con monto/fecha válidos.")
 else:
-    # Llamar a la función render_historial_pagos
+    # Llamar a la función render_historial_pagos con datos limpios
     render_historial_pagos(df_pagos)
 # === FIN HISTORIAL DE PAGOS ===
