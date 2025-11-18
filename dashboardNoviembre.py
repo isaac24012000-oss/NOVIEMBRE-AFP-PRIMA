@@ -13,6 +13,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import re
 import os
+from datetime import datetime
 
 # Ruta del archivo Excel (usar ruta relativa para Streamlit Cloud)
 EXCEL_PATH = os.path.join(os.getcwd(), "DATA TOTAL WORLDTEL NOVIEMBRE 2025.xlsx")  # Confirmar ruta relativa
@@ -952,6 +953,89 @@ st.markdown("""
 
 # ================= TABLA DE CASOS CRÍTICO =================
 
+# Función para exportar a Excel
+def export_to_excel(df_export):
+    from io import BytesIO
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from datetime import datetime
+    
+    output = BytesIO()
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Casos Críticos"
+    
+    # Encabezado con título
+    ws['A1'] = "CASOS CRÍTICOS - PRIORIDAD 13 + CONTACTO DIRECTO + SIN PAGO"
+    ws['A1'].font = Font(bold=True, size=14, color="FFFFFF")
+    ws['A1'].fill = PatternFill(start_color="C62828", end_color="C62828", fill_type="solid")
+    ws.merge_cells('A1:E1')
+    ws['A1'].alignment = Alignment(horizontal="center", vertical="center")
+    ws.row_dimensions[1].height = 25
+    
+    # Fecha de generación
+    ws['A2'] = f"Fecha de generación: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}"
+    ws['A2'].font = Font(italic=True, size=10)
+    ws.merge_cells('A2:E2')
+    ws.row_dimensions[2].height = 18
+    
+    # Encabezados de columnas
+    headers = ['Documento', 'Razón Social', 'Deuda Total', 'Operador', 'Campaña']
+    thin_border = Border(
+        left=Side(style='thin'),
+        right=Side(style='thin'),
+        top=Side(style='thin'),
+        bottom=Side(style='thin')
+    )
+    
+    for col_idx, header in enumerate(headers, 1):
+        cell = ws.cell(row=4, column=col_idx)
+        cell.value = header
+        cell.font = Font(bold=True, color="FFFFFF", size=11)
+        cell.fill = PatternFill(start_color="23395D", end_color="23395D", fill_type="solid")
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.border = thin_border
+    
+    ws.row_dimensions[4].height = 20
+    
+    # Datos
+    for row_idx, (_, row) in enumerate(df_export.iterrows(), 5):
+        ws.cell(row=row_idx, column=1).value = row['Documento']
+        ws.cell(row=row_idx, column=2).value = row['Razón Social']
+        ws.cell(row=row_idx, column=3).value = row['Deuda Total']
+        ws.cell(row=row_idx, column=4).value = row['Operador']
+        ws.cell(row=row_idx, column=5).value = row['Campaña']
+        
+        for col_idx in range(1, 6):
+            cell = ws.cell(row=row_idx, column=col_idx)
+            cell.border = thin_border
+            if col_idx == 3:  # Alinear números a la derecha
+                cell.alignment = Alignment(horizontal="right")
+            else:
+                cell.alignment = Alignment(horizontal="left")
+    
+    # Ajustar anchos de columnas
+    ws.column_dimensions['A'].width = 15
+    ws.column_dimensions['B'].width = 45
+    ws.column_dimensions['C'].width = 15
+    ws.column_dimensions['D'].width = 12
+    ws.column_dimensions['E'].width = 18
+    
+    # Fila de totales
+    total_row = len(df_export) + 5
+    ws.cell(row=total_row, column=1).value = "TOTAL"
+    ws.cell(row=total_row, column=1).font = Font(bold=True)
+    ws.cell(row=total_row, column=2).value = len(df_export)
+    ws.cell(row=total_row, column=2).font = Font(bold=True)
+    for col_idx in range(1, 6):
+        cell = ws.cell(row=total_row, column=col_idx)
+        cell.fill = PatternFill(start_color="FFE082", end_color="FFE082", fill_type="solid")
+        cell.border = thin_border
+    
+    wb.save(output)
+    output.seek(0)
+    return output.getvalue()
+
 st.markdown("""
 <div style='display: flex; align-items: center; margin-top:32px;'>
     <img src='https://img.icons8.com/emoji/48/000000/bomb-emoji.png' style='margin-right: 10px;'/>
@@ -961,6 +1045,17 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 df_critico = df_analisis[df_analisis['NIVEL_RIESGO'] == '+ALTA']
+
+# Preparar tabla de casos críticos para mostrar y exportar
+cols_critico = {
+    'DOCUMENTO': 'Documento',
+    'RAZON SOCIAL': 'Razón Social',
+    'DEUDA TOTAL': 'Deuda Total',
+    'OPERADOR': 'Operador',
+    'CAMPAÑA': 'Campaña'
+}
+df_critico_tabla = df_critico[list(cols_critico.keys())].rename(columns=cols_critico)
+
 st.write(f"Total de casos críticos detectados: {len(df_critico)}")
 
 # Descripción de distribución por campaña
@@ -969,6 +1064,18 @@ desc = "<b>Distribución por Campaña:</b><br>"
 for camp, cant in distribucion.items():
     desc += f"• <b>{camp}</b>: {cant} casos<br>"
 st.markdown(desc, unsafe_allow_html=True)
+
+# Botón para descargar Excel
+if not df_critico.empty:
+    excel_data = export_to_excel(df_critico_tabla)
+    st.download_button(
+        label="📥 Descargar tabla en Excel",
+        data=excel_data,
+        file_name=f"casos_criticos_{datetime.now().strftime('%d%m%Y_%H%M%S')}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        key="download_criticos"
+    )
+    st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
 
 # Estilo para el header de la tabla (rojo más intenso)
 st.markdown("""
@@ -999,15 +1106,6 @@ st.markdown("""
 
 
 # Mostrar tabla no interactiva, encabezado rojo y scroll horizontal
-cols_critico = {
-        'DOCUMENTO': 'Documento',
-        'RAZON SOCIAL': 'Razón Social',
-        'DEUDA TOTAL': 'Deuda Total',
-        'OPERADOR': 'Operador',
-        'CAMPAÑA': 'Campaña'
-}
-df_critico_tabla = df_critico[list(cols_critico.keys())].rename(columns=cols_critico)
-
 
 tabla_html = """
 <div style='overflow-x:auto; max-width:100%;'>
