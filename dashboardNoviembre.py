@@ -829,6 +829,239 @@ tabla_html = tabla_resumen_prioridad.to_html(index=False, classes='tabla-priorid
 st.markdown(tabla_html, unsafe_allow_html=True)
 # ================= FIN TABLA RESUMEN POR PRIORIDAD =================
 
+# ================= CLIENTES TOP POR CAMPAÑA =================
+st.markdown("---")
+st.markdown("""
+<div style='display: flex; align-items: center;'>
+    <h2 style='display: inline; font-size: 2.2rem; margin: 0;'>👑 Clientes TOP - Mayores Montos de Deuda</h2>
+</div>
+""", unsafe_allow_html=True)
+
+# Filtrar clientes por mayores montos y ordenar por DEUDA TOTAL descendente
+df_top_clientes = df.copy()
+df_top_clientes = df_top_clientes.sort_values('DEUDA TOTAL', ascending=False)
+
+# Selector de campaña
+campanias_top = df_top_clientes['CAMPAÑA'].unique().tolist()
+campania_top_seleccionada = st.selectbox('Selecciona una campaña para ver sus Clientes TOP:', campanias_top, key='campania_top_select')
+
+# Filtrar por campaña seleccionada
+df_top_campania = df_top_clientes[df_top_clientes['CAMPAÑA'] == campania_top_seleccionada].copy()
+
+# Slider para seleccionar cantidad de clientes a mostrar
+cantidad_top = st.slider('Cantidad de Clientes TOP a mostrar:', min_value=5, max_value=min(50, len(df_top_campania)), value=10, key='slider_top_clientes')
+
+# Top clientes de la campaña seleccionada
+df_top_n = df_top_campania.head(cantidad_top)[['DOCUMENTO', 'RAZON SOCIAL', 'DEUDA TOTAL', 'REC. PLANILLAS', 'CONTACTABILIDAD', 'ULTIMA FECHA GESTION']].copy()
+
+# Calcular métricas ANTES de renombrar columnas
+deuda_total_top = df_top_n['DEUDA TOTAL'].sum()
+recuperado_total_top = df_top_n['REC. PLANILLAS'].sum()
+tasa_recupero = (recuperado_total_top / deuda_total_top * 100) if deuda_total_top > 0 else 0
+
+# Preparar tabla
+df_top_n_tabla = df_top_n.rename(columns={
+    'DOCUMENTO': 'Documento',
+    'RAZON SOCIAL': 'Razón Social',
+    'DEUDA TOTAL': 'Deuda Total',
+    'REC. PLANILLAS': 'Recuperado',
+    'CONTACTABILIDAD': 'Contactabilidad',
+    'ULTIMA FECHA GESTION': 'Última Gestión'
+}).copy()
+
+# Formatear valores numéricos y fechas
+df_top_n_tabla['Deuda Total'] = df_top_n_tabla['Deuda Total'].apply(lambda x: f"S/. {x:,.2f}" if pd.notnull(x) else "N/A")
+df_top_n_tabla['Recuperado'] = df_top_n_tabla['Recuperado'].apply(lambda x: f"S/. {x:,.2f}" if pd.notnull(x) and x > 0 else "S/. 0.00")
+df_top_n_tabla['Última Gestión'] = df_top_n_tabla['Última Gestión'].apply(lambda x: x.strftime('%d/%m/%Y') if pd.notnull(x) else "Sin gestión")
+
+# Mostrar métricas resumen
+col_top1, col_top2, col_top3, col_top4 = st.columns(4)
+with col_top1:
+    st.metric("👥 Clientes TOP", len(df_top_n))
+with col_top2:
+    st.metric("💰 Deuda Total TOP", f"S/. {deuda_total_top:,.2f}")
+with col_top3:
+    st.metric("🏦 Recuperado", f"S/. {recuperado_total_top:,.2f}")
+with col_top4:
+    st.metric("📊 Tasa de Recupero", f"{tasa_recupero:.2f}%")
+
+# Estilos para tabla TOP
+st.markdown("""
+<style>
+.tabla-top th {
+    background: #d4af37 !important;
+    color: #1a1a1a !important;
+    font-weight: bold;
+    font-size: 1.05em;
+    padding: 12px 8px;
+    border: none;
+}
+.tabla-top td {
+    background: #f9f9f9;
+    color: #222;
+    font-size: 0.95em;
+    padding: 10px 8px;
+    border-bottom: 1px solid #e3e3e3;
+}
+.tabla-top tr:hover td {
+    background: #f0f0f0;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# Función para exportar Clientes TOP a Excel
+def export_clientes_top_excel(df_export, campania):
+    from io import BytesIO
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from datetime import datetime
+    
+    output = BytesIO()
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Clientes TOP"
+    
+    # Encabezado con título
+    ws['A1'] = f"CLIENTES TOP - MAYORES MONTOS DE DEUDA - {campania.upper()}"
+    ws['A1'].font = Font(bold=True, size=14, color="FFFFFF")
+    ws['A1'].fill = PatternFill(start_color="D4AF37", end_color="D4AF37", fill_type="solid")
+    ws.merge_cells('A1:G1')
+    ws['A1'].alignment = Alignment(horizontal="center", vertical="center")
+    ws.row_dimensions[1].height = 25
+    
+    # Fecha de generación
+    ws['A2'] = f"Fecha de generación: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}"
+    ws['A2'].font = Font(italic=True, size=10)
+    ws.merge_cells('A2:G2')
+    ws.row_dimensions[2].height = 18
+    
+    # Encabezados de columnas
+    headers = ['Documento', 'Razón Social', 'Deuda Total', 'Recuperado', 'Contactabilidad', 'Última Gestión', 'Campaña']
+    thin_border = Border(
+        left=Side(style='thin'),
+        right=Side(style='thin'),
+        top=Side(style='thin'),
+        bottom=Side(style='thin')
+    )
+    
+    for col_idx, header in enumerate(headers, 1):
+        cell = ws.cell(row=4, column=col_idx)
+        cell.value = header
+        cell.font = Font(bold=True, color="FFFFFF", size=11)
+        cell.fill = PatternFill(start_color="23395D", end_color="23395D", fill_type="solid")
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.border = thin_border
+    
+    ws.row_dimensions[4].height = 20
+    
+    # Datos
+    for row_idx, (_, row) in enumerate(df_export.iterrows(), 5):
+        ws.cell(row=row_idx, column=1).value = row['Documento']
+        ws.cell(row=row_idx, column=2).value = row['Razón Social']
+        ws.cell(row=row_idx, column=3).value = float(str(row['Deuda Total']).replace('S/. ', '').replace(',', ''))
+        ws.cell(row=row_idx, column=4).value = float(str(row['Recuperado']).replace('S/. ', '').replace(',', ''))
+        ws.cell(row=row_idx, column=5).value = row['Contactabilidad']
+        ws.cell(row=row_idx, column=6).value = row['Última Gestión']
+        ws.cell(row=row_idx, column=7).value = row.get('Campaña', campania)
+        
+        for col_idx in range(1, 8):
+            cell = ws.cell(row=row_idx, column=col_idx)
+            cell.border = thin_border
+            if col_idx in [3, 4]:  # Alinear números a la derecha
+                cell.alignment = Alignment(horizontal="right")
+                if col_idx in [3, 4]:
+                    cell.number_format = '#,##0.00'
+            else:
+                cell.alignment = Alignment(horizontal="left")
+    
+    # Ajustar anchos de columnas
+    ws.column_dimensions['A'].width = 15
+    ws.column_dimensions['B'].width = 45
+    ws.column_dimensions['C'].width = 15
+    ws.column_dimensions['D'].width = 15
+    ws.column_dimensions['E'].width = 18
+    ws.column_dimensions['F'].width = 15
+    ws.column_dimensions['G'].width = 18
+    
+    # Fila de totales
+    total_row = len(df_export) + 5
+    ws.cell(row=total_row, column=1).value = "TOTAL"
+    ws.cell(row=total_row, column=1).font = Font(bold=True)
+    ws.cell(row=total_row, column=2).value = len(df_export)
+    ws.cell(row=total_row, column=2).font = Font(bold=True)
+    
+    # Calcular totales de montos
+    total_deuda = sum([float(str(val).replace('S/. ', '').replace(',', '')) for val in df_export['Deuda Total']])
+    total_recuperado = sum([float(str(val).replace('S/. ', '').replace(',', '')) for val in df_export['Recuperado']])
+    
+    ws.cell(row=total_row, column=3).value = total_deuda
+    ws.cell(row=total_row, column=3).number_format = '#,##0.00'
+    ws.cell(row=total_row, column=4).value = total_recuperado
+    ws.cell(row=total_row, column=4).number_format = '#,##0.00'
+    
+    for col_idx in range(1, 8):
+        cell = ws.cell(row=total_row, column=col_idx)
+        cell.fill = PatternFill(start_color="FFE082", end_color="FFE082", fill_type="solid")
+        cell.border = thin_border
+        cell.font = Font(bold=True)
+    
+    wb.save(output)
+    output.seek(0)
+    return output.getvalue()
+
+# Mostrar tabla
+tabla_top_html = """
+<div style='overflow-x:auto; max-width:100%;'>
+    <div style='max-height:500px; overflow-y:auto; border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,0.07);'>
+        <table class='tabla-top' style='min-width:900px; width:100%;'>
+            <thead>
+                <tr>
+                    <th style='text-align:center; width:80px;'>#</th>
+                    <th>Documento</th>
+                    <th>Razón Social</th>
+                    <th style='text-align:right;'>Deuda Total</th>
+                    <th style='text-align:right;'>Recuperado</th>
+                    <th style='text-align:center;'>Contactabilidad</th>
+                    <th style='text-align:center;'>Última Gestión</th>
+                </tr>
+            </thead>
+            <tbody>
+"""
+for idx, (_, row) in enumerate(df_top_n_tabla.iterrows(), 1):
+    tabla_top_html += f"<tr>"
+    tabla_top_html += f"<td style='text-align:center; font-weight:bold;'>{idx}</td>"
+    tabla_top_html += f"<td>{row['Documento']}</td>"
+    tabla_top_html += f"<td>{row['Razón Social']}</td>"
+    tabla_top_html += f"<td style='text-align:right;'>{row['Deuda Total']}</td>"
+    tabla_top_html += f"<td style='text-align:right;'>{row['Recuperado']}</td>"
+    tabla_top_html += f"<td style='text-align:center;'>{row['Contactabilidad']}</td>"
+    tabla_top_html += f"<td style='text-align:center;'>{row['Última Gestión']}</td>"
+    tabla_top_html += "</tr>"
+tabla_top_html += """
+            </tbody>
+        </table>
+    </div>
+</div>
+"""
+st.markdown(tabla_top_html, unsafe_allow_html=True)
+
+# Botón para descargar Excel
+st.markdown("<div style='height: 15px;'></div>", unsafe_allow_html=True)
+col_export1, col_export2, col_export3 = st.columns([1, 2, 1])
+with col_export2:
+    if not df_top_n_tabla.empty:
+        excel_data = export_clientes_top_excel(df_top_n_tabla, campania_top_seleccionada)
+        st.download_button(
+            label="📥 Descargar Clientes TOP en Excel",
+            data=excel_data,
+            file_name=f"clientes_top_{campania_top_seleccionada.lower()}_{datetime.now().strftime('%d%m%Y_%H%M%S')}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key="download_clientes_top",
+            use_container_width=True
+        )
+
+# ================= FIN CLIENTES TOP POR CAMPAÑA =================
+
 # ================= ANALISIS ESTRATEGICO POR NIVEL DE PRIORIDAD =================
 st.markdown("---")
 st.markdown("""
