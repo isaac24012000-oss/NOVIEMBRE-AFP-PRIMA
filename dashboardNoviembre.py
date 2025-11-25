@@ -852,7 +852,7 @@ df_top_campania = df_top_clientes[df_top_clientes['CAMPAÑA'] == campania_top_se
 cantidad_top = st.slider('Cantidad de Clientes TOP a mostrar:', min_value=5, max_value=min(50, len(df_top_campania)), value=10, key='slider_top_clientes')
 
 # Top clientes de la campaña seleccionada
-df_top_n = df_top_campania.head(cantidad_top)[['DOCUMENTO', 'RAZON SOCIAL', 'DEUDA TOTAL', 'REC. PLANILLAS', 'CONTACTABILIDAD', 'ULTIMA FECHA GESTION']].copy()
+df_top_n = df_top_campania.head(cantidad_top)[['DOCUMENTO', 'RAZON SOCIAL', 'ASESOR', 'DEUDA TOTAL', 'REC. PLANILLAS', 'CONTACTABILIDAD', 'ULTIMA FECHA GESTION']].copy()
 
 # Calcular métricas ANTES de renombrar columnas
 deuda_total_top = df_top_n['DEUDA TOTAL'].sum()
@@ -863,6 +863,7 @@ tasa_recupero = (recuperado_total_top / deuda_total_top * 100) if deuda_total_to
 df_top_n_tabla = df_top_n.rename(columns={
     'DOCUMENTO': 'Documento',
     'RAZON SOCIAL': 'Razón Social',
+    'ASESOR': 'Asesor',
     'DEUDA TOTAL': 'Deuda Total',
     'REC. PLANILLAS': 'Recuperado',
     'CONTACTABILIDAD': 'Contactabilidad',
@@ -936,7 +937,7 @@ def export_clientes_top_excel(df_export, campania):
     ws.row_dimensions[2].height = 18
     
     # Encabezados de columnas
-    headers = ['Documento', 'Razón Social', 'Deuda Total', 'Recuperado', 'Contactabilidad', 'Última Gestión', 'Campaña']
+    headers = ['Documento', 'Razón Social', 'Asesor', 'Deuda Total', 'Recuperado', 'Contactabilidad', 'Última Gestión', 'Campaña']
     thin_border = Border(
         left=Side(style='thin'),
         right=Side(style='thin'),
@@ -958,18 +959,19 @@ def export_clientes_top_excel(df_export, campania):
     for row_idx, (_, row) in enumerate(df_export.iterrows(), 5):
         ws.cell(row=row_idx, column=1).value = row['Documento']
         ws.cell(row=row_idx, column=2).value = row['Razón Social']
-        ws.cell(row=row_idx, column=3).value = float(str(row['Deuda Total']).replace('S/. ', '').replace(',', ''))
-        ws.cell(row=row_idx, column=4).value = float(str(row['Recuperado']).replace('S/. ', '').replace(',', ''))
-        ws.cell(row=row_idx, column=5).value = row['Contactabilidad']
-        ws.cell(row=row_idx, column=6).value = row['Última Gestión']
-        ws.cell(row=row_idx, column=7).value = row.get('Campaña', campania)
+        ws.cell(row=row_idx, column=3).value = row['Asesor']
+        ws.cell(row=row_idx, column=4).value = float(str(row['Deuda Total']).replace('S/. ', '').replace(',', ''))
+        ws.cell(row=row_idx, column=5).value = float(str(row['Recuperado']).replace('S/. ', '').replace(',', ''))
+        ws.cell(row=row_idx, column=6).value = row['Contactabilidad']
+        ws.cell(row=row_idx, column=7).value = row['Última Gestión']
+        ws.cell(row=row_idx, column=8).value = row.get('Campaña', campania)
         
-        for col_idx in range(1, 8):
+        for col_idx in range(1, 9):
             cell = ws.cell(row=row_idx, column=col_idx)
             cell.border = thin_border
-            if col_idx in [3, 4]:  # Alinear números a la derecha
+            if col_idx in [4, 5]:  # Alinear números a la derecha
                 cell.alignment = Alignment(horizontal="right")
-                if col_idx in [3, 4]:
+                if col_idx in [4, 5]:
                     cell.number_format = '#,##0.00'
             else:
                 cell.alignment = Alignment(horizontal="left")
@@ -977,11 +979,12 @@ def export_clientes_top_excel(df_export, campania):
     # Ajustar anchos de columnas
     ws.column_dimensions['A'].width = 15
     ws.column_dimensions['B'].width = 45
-    ws.column_dimensions['C'].width = 15
+    ws.column_dimensions['C'].width = 20
     ws.column_dimensions['D'].width = 15
-    ws.column_dimensions['E'].width = 18
-    ws.column_dimensions['F'].width = 15
-    ws.column_dimensions['G'].width = 18
+    ws.column_dimensions['E'].width = 15
+    ws.column_dimensions['F'].width = 18
+    ws.column_dimensions['G'].width = 15
+    ws.column_dimensions['H'].width = 18
     
     # Fila de totales
     total_row = len(df_export) + 5
@@ -994,12 +997,12 @@ def export_clientes_top_excel(df_export, campania):
     total_deuda = sum([float(str(val).replace('S/. ', '').replace(',', '')) for val in df_export['Deuda Total']])
     total_recuperado = sum([float(str(val).replace('S/. ', '').replace(',', '')) for val in df_export['Recuperado']])
     
-    ws.cell(row=total_row, column=3).value = total_deuda
-    ws.cell(row=total_row, column=3).number_format = '#,##0.00'
-    ws.cell(row=total_row, column=4).value = total_recuperado
+    ws.cell(row=total_row, column=4).value = total_deuda
     ws.cell(row=total_row, column=4).number_format = '#,##0.00'
+    ws.cell(row=total_row, column=5).value = total_recuperado
+    ws.cell(row=total_row, column=5).number_format = '#,##0.00'
     
-    for col_idx in range(1, 8):
+    for col_idx in range(1, 9):
         cell = ws.cell(row=total_row, column=col_idx)
         cell.fill = PatternFill(start_color="FFE082", end_color="FFE082", fill_type="solid")
         cell.border = thin_border
@@ -1013,12 +1016,13 @@ def export_clientes_top_excel(df_export, campania):
 tabla_top_html = """
 <div style='overflow-x:auto; max-width:100%;'>
     <div style='max-height:500px; overflow-y:auto; border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,0.07);'>
-        <table class='tabla-top' style='min-width:900px; width:100%;'>
+        <table class='tabla-top' style='min-width:1050px; width:100%;'>
             <thead>
                 <tr>
-                    <th style='text-align:center; width:80px;'>#</th>
+                    <th style='text-align:center; width:50px;'>#</th>
                     <th>Documento</th>
                     <th>Razón Social</th>
+                    <th>Asesor</th>
                     <th style='text-align:right;'>Deuda Total</th>
                     <th style='text-align:right;'>Recuperado</th>
                     <th style='text-align:center;'>Contactabilidad</th>
@@ -1032,6 +1036,7 @@ for idx, (_, row) in enumerate(df_top_n_tabla.iterrows(), 1):
     tabla_top_html += f"<td style='text-align:center; font-weight:bold;'>{idx}</td>"
     tabla_top_html += f"<td>{row['Documento']}</td>"
     tabla_top_html += f"<td>{row['Razón Social']}</td>"
+    tabla_top_html += f"<td>{row['Asesor']}</td>"
     tabla_top_html += f"<td style='text-align:right;'>{row['Deuda Total']}</td>"
     tabla_top_html += f"<td style='text-align:right;'>{row['Recuperado']}</td>"
     tabla_top_html += f"<td style='text-align:center;'>{row['Contactabilidad']}</td>"
