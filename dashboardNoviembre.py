@@ -1067,6 +1067,243 @@ with col_export2:
 
 # ================= FIN CLIENTES TOP POR CAMPAÑA =================
 
+# ================= CASOS CON SOLO REC. GASTOS (SIN REC. PLANILLAS) =================
+st.markdown("---")
+st.markdown("""
+<div style='display: flex; align-items: center;'>
+    <h2 style='display: inline; font-size: 2.2rem; margin: 0;'>⚠️ Casos SOLO con REC. GASTOS (Sin REC. PLANILLAS)</h2>
+</div>
+""", unsafe_allow_html=True)
+
+st.markdown("""
+<p style='font-size: 1.05em; color: #d32f2f; font-weight: bold;'>
+    ⚡ URGENCIA: Estos casos requieren REC. PLANILLAS primero. Los gastos no se considerarán sin planillas.
+</p>
+""", unsafe_allow_html=True)
+
+# Filtrar casos con SOLO REC. GASTOS (tiene REC. GASTOS pero NO tiene REC. PLANILLAS)
+df_solo_gastos = df[
+    ((df['REC. GASTOS'].notna()) & (df['REC. GASTOS'] > 0)) &  # Tiene REC. GASTOS
+    ((df['REC. PLANILLAS'].isna()) | (df['REC. PLANILLAS'] == 0) | (df['REC. PLANILLAS'] == ''))  # NO tiene REC. PLANILLAS
+].copy()
+
+# Preparar tabla
+df_solo_gastos_tabla = df_solo_gastos[[
+    'DOCUMENTO',
+    'RAZON SOCIAL',
+    'ULTIMA FECHA GESTION',
+    'ASESOR',
+    'DEUDA TOTAL',
+    'CONTACTABILIDAD'
+]].copy()
+
+# Renombrar columnas
+df_solo_gastos_tabla = df_solo_gastos_tabla.rename(columns={
+    'DOCUMENTO': 'Documento',
+    'RAZON SOCIAL': 'Razón Social',
+    'ULTIMA FECHA GESTION': 'Última Fecha de Gestión',
+    'ASESOR': 'Asesor',
+    'DEUDA TOTAL': 'Deuda Total',
+    'CONTACTABILIDAD': 'Contactabilidad'
+})
+
+# Formatear valores
+df_solo_gastos_tabla['Deuda Total'] = df_solo_gastos_tabla['Deuda Total'].apply(
+    lambda x: f"S/. {x:,.2f}" if pd.notnull(x) else "N/A"
+)
+df_solo_gastos_tabla['Última Fecha de Gestión'] = df_solo_gastos_tabla['Última Fecha de Gestión'].apply(
+    lambda x: x.strftime('%d/%m/%Y') if pd.notnull(x) else "Sin gestión"
+)
+
+# Mostrar métricas
+col_gastos1, col_gastos2, col_gastos3 = st.columns(3)
+with col_gastos1:
+    st.metric("🚨 Casos de URGENCIA", len(df_solo_gastos_tabla))
+with col_gastos2:
+    deuda_gastos = df_solo_gastos['DEUDA TOTAL'].sum()
+    st.metric("💰 Deuda Total en Urgencia", f"S/. {deuda_gastos:,.2f}")
+with col_gastos3:
+    rec_gastos_urgencia = df_solo_gastos['REC. GASTOS'].sum()
+    st.metric("🏛️ REC. GASTOS Registrado", f"S/. {rec_gastos_urgencia:,.2f}")
+
+# Función para exportar a Excel
+def export_solo_gastos_excel(df_export):
+    from io import BytesIO
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from datetime import datetime
+    
+    output = BytesIO()
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Solo REC. Gastos"
+    
+    # Encabezado con título
+    ws['A1'] = "CASOS CON SOLO REC. GASTOS (SIN REC. PLANILLAS) - URGENCIA"
+    ws['A1'].font = Font(bold=True, size=14, color="FFFFFF")
+    ws['A1'].fill = PatternFill(start_color="D32F2F", end_color="D32F2F", fill_type="solid")
+    ws.merge_cells('A1:F1')
+    ws['A1'].alignment = Alignment(horizontal="center", vertical="center")
+    ws.row_dimensions[1].height = 25
+    
+    # Fecha de generación
+    ws['A2'] = f"Fecha de generación: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}"
+    ws['A2'].font = Font(italic=True, size=10)
+    ws.merge_cells('A2:F2')
+    ws.row_dimensions[2].height = 18
+    
+    # Leyenda
+    ws['A3'] = "⚡ URGENCIA: Estos casos necesitan REC. PLANILLAS primero. Los gastos no se considerarán sin planillas."
+    ws['A3'].font = Font(italic=True, size=10, color="C62828")
+    ws.merge_cells('A3:F3')
+    ws.row_dimensions[3].height = 18
+    
+    # Encabezados de columnas
+    headers = ['Documento', 'Razón Social', 'Última Fecha de Gestión', 'Asesor', 'Deuda Total', 'Contactabilidad']
+    thin_border = Border(
+        left=Side(style='thin'),
+        right=Side(style='thin'),
+        top=Side(style='thin'),
+        bottom=Side(style='thin')
+    )
+    
+    for col_idx, header in enumerate(headers, 1):
+        cell = ws.cell(row=5, column=col_idx)
+        cell.value = header
+        cell.font = Font(bold=True, color="FFFFFF", size=11)
+        cell.fill = PatternFill(start_color="23395D", end_color="23395D", fill_type="solid")
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.border = thin_border
+    
+    ws.row_dimensions[5].height = 20
+    
+    # Datos
+    for row_idx, (_, row) in enumerate(df_export.iterrows(), 6):
+        ws.cell(row=row_idx, column=1).value = row['Documento']
+        ws.cell(row=row_idx, column=2).value = row['Razón Social']
+        ws.cell(row=row_idx, column=3).value = row['Última Fecha de Gestión']
+        ws.cell(row=row_idx, column=4).value = row['Asesor']
+        ws.cell(row=row_idx, column=5).value = float(str(row['Deuda Total']).replace('S/. ', '').replace(',', ''))
+        ws.cell(row=row_idx, column=6).value = row['Contactabilidad']
+        
+        for col_idx in range(1, 7):
+            cell = ws.cell(row=row_idx, column=col_idx)
+            cell.border = thin_border
+            if col_idx == 5:  # Alinear números a la derecha
+                cell.alignment = Alignment(horizontal="right")
+                cell.number_format = '#,##0.00'
+            else:
+                cell.alignment = Alignment(horizontal="left")
+    
+    # Ajustar anchos de columnas
+    ws.column_dimensions['A'].width = 15
+    ws.column_dimensions['B'].width = 45
+    ws.column_dimensions['C'].width = 18
+    ws.column_dimensions['D'].width = 15
+    ws.column_dimensions['E'].width = 15
+    ws.column_dimensions['F'].width = 18
+    
+    # Fila de totales
+    total_row = len(df_export) + 6
+    ws.cell(row=total_row, column=1).value = "TOTAL"
+    ws.cell(row=total_row, column=1).font = Font(bold=True)
+    ws.cell(row=total_row, column=2).value = len(df_export)
+    ws.cell(row=total_row, column=2).font = Font(bold=True)
+    
+    total_deuda = sum([float(str(val).replace('S/. ', '').replace(',', '')) for val in df_export['Deuda Total']])
+    
+    ws.cell(row=total_row, column=5).value = total_deuda
+    ws.cell(row=total_row, column=5).number_format = '#,##0.00'
+    
+    for col_idx in range(1, 7):
+        cell = ws.cell(row=total_row, column=col_idx)
+        cell.fill = PatternFill(start_color="FFB3BA", end_color="FFB3BA", fill_type="solid")
+        cell.border = thin_border
+        cell.font = Font(bold=True)
+    
+    wb.save(output)
+    output.seek(0)
+    return output.getvalue()
+
+# Mostrar tabla
+if len(df_solo_gastos_tabla) > 0:
+    # Estilos para tabla urgencia
+    st.markdown("""
+    <style>
+    .tabla-urgencia th {
+        background: #d32f2f !important;
+        color: #fff !important;
+        font-weight: bold;
+        font-size: 1.05em;
+        padding: 12px 8px;
+        border: none;
+    }
+    .tabla-urgencia td {
+        background: #fff;
+        color: #222;
+        font-size: 0.95em;
+        padding: 10px 8px;
+        border-bottom: 1px solid #e3e3e3;
+    }
+    .tabla-urgencia tr:hover td {
+        background: #ffe0e0;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    tabla_urgencia_html = """
+    <div style='overflow-x:auto; max-width:100%;'>
+        <div style='max-height:500px; overflow-y:auto; border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,0.07);'>
+            <table class='tabla-urgencia' style='min-width:950px; width:100%;'>
+                <thead>
+                    <tr>
+                        <th style='text-align:center; width:50px;'>#</th>
+                        <th>Documento</th>
+                        <th>Razón Social</th>
+                        <th>Última Fecha de Gestión</th>
+                        <th>Asesor</th>
+                        <th style='text-align:right;'>Deuda Total</th>
+                        <th style='text-align:center;'>Contactabilidad</th>
+                    </tr>
+                </thead>
+                <tbody>
+    """
+    for idx, (_, row) in enumerate(df_solo_gastos_tabla.iterrows(), 1):
+        tabla_urgencia_html += f"<tr>"
+        tabla_urgencia_html += f"<td style='text-align:center; font-weight:bold;'>{idx}</td>"
+        tabla_urgencia_html += f"<td>{row['Documento']}</td>"
+        tabla_urgencia_html += f"<td>{row['Razón Social']}</td>"
+        tabla_urgencia_html += f"<td style='text-align:center;'>{row['Última Fecha de Gestión']}</td>"
+        tabla_urgencia_html += f"<td>{row['Asesor']}</td>"
+        tabla_urgencia_html += f"<td style='text-align:right;'>{row['Deuda Total']}</td>"
+        tabla_urgencia_html += f"<td style='text-align:center;'>{row['Contactabilidad']}</td>"
+        tabla_urgencia_html += "</tr>"
+    tabla_urgencia_html += """
+                </tbody>
+            </table>
+        </div>
+    </div>
+    """
+    st.markdown(tabla_urgencia_html, unsafe_allow_html=True)
+    
+    # Botón para descargar Excel
+    st.markdown("<div style='height: 15px;'></div>", unsafe_allow_html=True)
+    col_export_gastos1, col_export_gastos2, col_export_gastos3 = st.columns([1, 2, 1])
+    with col_export_gastos2:
+        excel_data = export_solo_gastos_excel(df_solo_gastos_tabla)
+        st.download_button(
+            label="📥 Descargar Casos de URGENCIA en Excel",
+            data=excel_data,
+            file_name=f"casos_solo_gastos_urgencia_{datetime.now().strftime('%d%m%Y_%H%M%S')}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key="download_solo_gastos",
+            use_container_width=True
+        )
+else:
+    st.success("✅ No hay casos con solo REC. GASTOS. Todos los casos están bien clasificados.")
+
+# ================= FIN CASOS CON SOLO REC. GASTOS =================
+
 # ================= ANALISIS ESTRATEGICO POR NIVEL DE PRIORIDAD =================
 st.markdown("---")
 st.markdown("""
